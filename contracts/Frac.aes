@@ -1,0 +1,177 @@
+
+contract Frac =
+
+    function gcd(a : int, b : int) =
+        if (b == 0) a else gcd(b, a mod b)
+
+    function abs_int(a : int) = if (a < 0) -a else a
+
+    datatype frac = Pos(int, int) | Zero | Neg(int, int)
+
+    function is_sane(f) = switch(f)
+        Pos(n, d) => n > 0 && d > 0
+        Zero => true
+        Neg(n, d) => n > 0 && d > 0
+
+    function nom(f) = switch(f)
+        Pos(n, _) => n
+        Neg(n, _) => -n
+        Zero      => 0
+
+    function den(f) = switch(f)
+        Pos(_, d) => d
+        Neg(_, d) => d
+        Zero      => 1
+
+    function to_pair(f) = switch(f)
+        Pos(n, d) => (n, d)
+        Neg(n, d) => (-n, d)
+        Zero      => (0, 1)
+
+    function sign(f) = switch(f)
+        Pos(_, _) => 1
+        Neg(_, _) => -1
+        Zero      => 0
+
+    function simplify(f : frac) =
+        let cd = gcd(nom(f), den(f))
+        switch(f)
+            Neg(n, d) => Neg(n / cd, d / cd)
+            Zero  => Zero
+            Pos(n, d)  => Pos(n / cd, d / cd)
+
+    function make_frac(n, d) =
+        if (d == 0) abort("Division by zero")
+        elif (n == 0) Zero
+        elif ((n < 0) == (d < 0)) simplify(Pos(abs_int(n), abs_int(d)))
+        else simplify(Neg(abs_int(n), abs_int(d)))
+
+    function eq(a, b) = nom(a) * den(b) == nom(b) * den(a)
+
+    function neq(a, b) = nom(a) * den(b) != nom(b) * den(a)
+
+    function geq(a, b) = nom(a) * den(b) >= nom(b) * den(a)
+
+    function leq(a, b) = nom(a) * den(b) =< nom(b) * den(a)
+
+    function gt(a, b) = nom(a) * den(b) > nom(b) * den(a)
+
+    function lt(a, b) = nom(a) * den(b) > nom(b) * den(a)
+
+    function abs(f) = switch(f)
+        Pos(n, d) => Pos(n, d)
+        Zero      => Zero
+        Neg(n, d) => Pos(n, d)
+
+    function from_int(n : int) = make_frac(n, 1)
+
+    function floor(f) = switch(f)
+        Pos(n, d) => n / d
+        Zero      => 0
+        Neg(n, d) => -(n + d - 1) / d
+
+    function ceil(f) = switch(f)
+        Pos(n, d) => (n + d - 1) / d
+        Zero      => 0
+        Neg(n, d) => -n / d
+
+    function add(a : frac, b : frac) = make_frac(nom(a) * den(b) + nom(b) * den(a), den(a) * den(b))
+
+    function neg(a : frac) = switch(a)
+        Neg(n, d) => Pos(n, d)
+        Zero      => Zero
+        Pos(n, d) => Neg(n, d)
+
+    function sub(a : frac, b : frac) = add(a, neg(b))
+
+    function inv(a : frac) = switch(a)
+        Neg(n, d) => Neg(d, n)
+        Zero      => abort("Division by zero")
+        Pos(n, d) => Pos(d, n)
+
+    function mul(a : frac, b : frac) = make_frac(nom(a) * nom(b), den(a) * den(b))
+
+    function div(a : frac, b : frac) = mul(a, inv(b))
+
+    function assert_eq_int(a : int, b : int, name : string) =
+        if (a != b) abort(name) else ()
+    function assert_eq_frac(a : frac, b : frac, name : string) =
+        if (neq(a, b)) abort(name) else ()
+    function assert_eq_efrac(a : frac, b : frac, name : string) =
+        if (a!=b) abort(name) else ()
+
+    function test() =
+
+        // one
+        assert_eq_frac(make_frac(1,1), make_frac(2, 2), "one")
+        assert_eq_frac(make_frac(-1,1), make_frac(-123, 123), "one neg")
+        assert_eq_frac(make_frac(1,-1), make_frac(-1, 1), "one neg swapped sign")
+        assert_eq_frac(make_frac(3,3), make_frac(-123, -123), "one two sides")
+
+        // zero
+        assert_eq_frac(make_frac(0,1), make_frac(0, 2), "positive zero")
+        assert_eq_frac(make_frac(0,111), make_frac(0, -2), "positive-negative zero")
+
+        // simplification
+        assert_eq_frac(make_frac(1,2), make_frac(2,4), "simplify")
+        assert_eq_frac(make_frac(-3,-9), make_frac(-5,-15), "simplify from neg")
+        assert_eq_frac(make_frac(-5,-25), make_frac(1,5), "simplify from two sides")
+
+        //sign
+        assert_eq_int(sign(make_frac(-1, 300)), -1, "sign neg 1")
+        assert_eq_int(sign(make_frac(1, -300)), -1, "sign neg 2")
+        assert_eq_int(sign(make_frac(0, 300)), 0, "sign zero 1")
+        assert_eq_int(sign(make_frac(0, -300)), 0, "sign zero 2")
+        assert_eq_int(sign(make_frac(1, 300)), 1, "sign pos 1")
+        assert_eq_int(sign(make_frac(-1, -300)), 1, "sign pos 2")
+        
+        // neg
+        assert_eq_frac(make_frac(1,2), neg(make_frac(-1,2)), "neg 1")
+        assert_eq_frac(make_frac(-1,2), neg(make_frac(1,2)), "neg 2")
+        assert_eq_frac(make_frac(1,2), neg(make_frac(1,-2)), "neg 3")
+        assert_eq_frac(make_frac(1,-2), neg(make_frac(1,2)), "neg 4")
+
+        //inv
+        assert_eq_frac(make_frac(1,2), inv(make_frac(2,1)), "inv 1")
+        assert_eq_frac(make_frac(-1,2), inv(make_frac(-2,1)), "inv 2")
+        assert_eq_frac(make_frac(-1,-2), inv(make_frac(-2,-1)), "inv 3")
+        assert_eq_frac(make_frac(-1,2), inv(make_frac(2,-1)), "inv 4")
+        
+        //construction / deconstruction
+        assert_eq_frac(make_frac(1,1), from_int(1), "from int 1")
+        assert_eq_frac(make_frac(13,13), from_int(1), "from int 2")
+        assert_eq_frac(make_frac(-26,-13), from_int(2), "from int 3")
+        assert_eq_frac(make_frac(0,123), from_int(0), "from int 4")
+
+        assert_eq_int(floor(make_frac(1,1)), 1, "floor 1")
+        assert_eq_int(floor(make_frac(-1,1)), -1, "floor 2")
+        assert_eq_int(floor(make_frac(1,2)), 0, "floor 2")
+        assert_eq_int(floor(make_frac(-1,2)), -1, "floor 3")
+        assert_eq_int(floor(make_frac(25,5)), 5, "floor 4")
+        assert_eq_int(floor(make_frac(26,5)), 5, "floor 5")
+
+        assert_eq_int(ceil(make_frac(1,1)), 1, "ceil 1")
+        assert_eq_int(ceil(make_frac(-1,1)), -1, "ceil 2")
+        assert_eq_int(ceil(make_frac(1,2)), 1, "ceil 2")
+        assert_eq_int(ceil(make_frac(-1,2)), 0, "ceil 3")
+        assert_eq_int(ceil(make_frac(25,5)), 5, "ceil 4")
+        assert_eq_int(ceil(make_frac(26,5)), 6, "ceil 5")
+
+        // add
+        assert_eq_frac(add(from_int(40), from_int(2)) , from_int(42), "40 + 2")
+        assert_eq_frac(add(make_frac(1,2), make_frac(1,2)) , from_int(1), "1/2 + 1/2")
+        assert_eq_frac(add(make_frac(-1,2), make_frac(1,2)) , from_int(0), "-1/2 + 1/2")
+        assert_eq_frac(add(make_frac(1,2), make_frac(-1,2)) , from_int(0), "1/2 + -1/2")
+        assert_eq_frac(add(make_frac(1,2), make_frac(1,3)) , make_frac(5,6), "1/2 + 1/3")
+        assert_eq_frac(add(make_frac(1,3), make_frac(1,2)) , make_frac(5,6), "1/3 + 1/2")
+        assert_eq_frac(add(make_frac(1,2), make_frac(1,6)) , make_frac(2,3), "1/2 + 1/6")
+
+        //mul
+        assert_eq_frac(mul(make_frac(1,2), make_frac(1,2)) , make_frac(1,4), "1/2 * 1/2")
+        assert_eq_frac(mul(make_frac(1,2), make_frac(2,1)) , from_int(1), "1/2 * 2")
+        assert_eq_frac(mul(make_frac(3,-2), make_frac(-2,3)) , from_int(1), "3/-2 * 2/3")
+        assert_eq_frac(mul(make_frac(-1,2), make_frac(2,1)) , from_int(-1), "-1/2 * 2")
+        assert_eq_frac(mul(from_int(2), from_int(4)) , from_int(8), "2 * 4")
+        assert_eq_frac(mul(from_int(0), from_int(4)) , from_int(0), "0 * 4")
+        assert_eq_frac(mul(from_int(2), from_int(0)) , from_int(0), "2 * 0")
+        assert_eq_frac(mul(from_int(2), from_int(1)) , from_int(2), "2 * 1")
