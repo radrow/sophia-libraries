@@ -1,4 +1,3 @@
-
 contract Frac =
 
     function gcd(a : int, b : int) =
@@ -13,7 +12,7 @@ contract Frac =
         Zero => true
         Neg(n, d) => n > 0 && d > 0
 
-    function nom(f) = switch(f)
+    function num(f) = switch(f)
         Pos(n, _) => n
         Neg(n, _) => -n
         Zero      => 0
@@ -33,30 +32,35 @@ contract Frac =
         Neg(_, _) => -1
         Zero      => 0
 
+    function to_str(f) = switch(f)
+        Pos(n, d) => String.concat(Int.to_str(n), if (d == 1) "" else String.concat("/", Int.to_str(d)))
+        Pos(n, d) => String.concat(String.concat("-", Int.to_str(n)), if (d == 1) "" else String.concat("/", Int.to_str(d)))
+        Zero      => "0"
+
     function simplify(f : frac) =
-        let cd = gcd(nom(f), den(f))
+        let cd = gcd(num(f), den(f))
         switch(f)
             Neg(n, d) => Neg(n / cd, d / cd)
             Zero  => Zero
             Pos(n, d)  => Pos(n / cd, d / cd)
 
-    function make_frac(n, d) =
+    function make_frac(n : int, d : int): frac =
         if (d == 0) abort("Division by zero")
         elif (n == 0) Zero
         elif ((n < 0) == (d < 0)) simplify(Pos(abs_int(n), abs_int(d)))
         else simplify(Neg(abs_int(n), abs_int(d)))
 
-    function eq(a, b) = nom(a) * den(b) == nom(b) * den(a)
+    function eq(a, b) = num(a) * den(b) == num(b) * den(a)
 
-    function neq(a, b) = nom(a) * den(b) != nom(b) * den(a)
+    function neq(a, b) = num(a) * den(b) != num(b) * den(a)
 
-    function geq(a, b) = nom(a) * den(b) >= nom(b) * den(a)
+    function geq(a, b) = num(a) * den(b) >= num(b) * den(a)
 
-    function leq(a, b) = nom(a) * den(b) =< nom(b) * den(a)
+    function leq(a, b) = num(a) * den(b) =< num(b) * den(a)
 
-    function gt(a, b) = nom(a) * den(b) > nom(b) * den(a)
+    function gt(a, b) = num(a) * den(b) > num(b) * den(a)
 
-    function lt(a, b) = nom(a) * den(b) > nom(b) * den(a)
+    function lt(a, b) = num(a) * den(b) > num(b) * den(a)
 
     function abs(f) = switch(f)
         Pos(n, d) => Pos(n, d)
@@ -74,8 +78,18 @@ contract Frac =
         Pos(n, d) => (n + d - 1) / d
         Zero      => 0
         Neg(n, d) => -n / d
+    
+    function round_to_zero(f) = switch(f)
+        Pos(n, d) => n / d
+        Zero      => 0
+        Neg(n, d) => n / d
 
-    function add(a : frac, b : frac) = make_frac(nom(a) * den(b) + nom(b) * den(a), den(a) * den(b))
+    function round_from_zero(f) = switch(f)
+        Pos(n, d) => (n + d - 1) / d
+        Zero      => 0
+        Neg(n, d) => -(n + d - 1) / d
+
+    function add(a : frac, b : frac) = make_frac(num(a) * den(b) + num(b) * den(a), den(a) * den(b))
 
     function neg(a : frac) = switch(a)
         Neg(n, d) => Pos(n, d)
@@ -89,16 +103,73 @@ contract Frac =
         Zero      => abort("Division by zero")
         Pos(n, d) => Pos(d, n)
 
-    function mul(a : frac, b : frac) = make_frac(nom(a) * nom(b), den(a) * den(b))
+    function mul(a : frac, b : frac) = make_frac(num(a) * num(b), den(a) * den(b))
 
     function div(a : frac, b : frac) = mul(a, inv(b))
+
+    function int_exp_go(b : frac, e : int) =
+            if (e == 0) from_int(1)
+            elif (e == 1) b
+            else
+                let half = int_exp_go(b, e / 2)
+                if (e mod 2 == 1) mul(mul(half, half), b)
+                else mul(half, half)
+    function int_exp(b : frac, e : int): frac =
+        if (sign(b) == 0 && e == 0) abort("Zero to the zero exponentation")
+        elif (e < 0) inv(int_exp_go(b, -e))
+        else int_exp_go(b, e)
+
+//////// String
+
+    function concatList(l) = switch(l)
+        [] => ""
+        s::rest => String.concat(s, concatList(rest))
+
+//////// Functional
+
+    function compose(f : 'b => 'c, g : 'a => 'b) : 'a => 'c = (x) => f(g(x))
+
+    function curry2(f) = (a) => ((b) => f(a, b))
+    function curry3(f) = (a) => ((b) => ((c) => f(a, b, c)))
+
+    function iter(n : int, f : 'a => 'a, start : 'a) =
+        if (n < 0) abort("Negative iteration")
+        elif (n == 0) start
+        else f(iter((n-1), f, start))
+
+/////// Approx
+
+    private function power(base : frac, exp : frac, max_err : frac): frac =
+        if (sign(max_err) == 0) abort("Negative error") 
+        else root(int_exp(base, num(exp)), den(exp), max_err)
+
+    private function root(base : frac, s : int, max_err : frac): frac =
+        if (s == 1) base
+        elif (s == -1) inv(base)
+        elif (s == 0) abort("Zero root")
+        else bin_search((guess) => sub(base, int_exp(guess, s)), from_int(0), base, max_err)
+
+    /**
+     * @param rate Function that describes whether the guess is too low or too big. Negative rate will raise guess,
+                   positive will lower. If rate is between [-threshold, threshold] than the value is considered correct.
+     */
+    private function bin_search(rate : frac => frac, from : frac, to : frac, threshold : frac): frac =
+        let mid = add(div(from, from_int(2)), div(to, from_int(2)))
+        let r = rate(mid)
+        if (lt(r, neg(threshold))) bin_search(rate, mid, to, threshold)
+        elif (gt(r, threshold)) bin_search(rate, from, mid, threshold)
+        else mid
+
+
+/////// Test
 
     function assert_eq_int(a : int, b : int, name : string) =
         if (a != b) abort(name) else ()
     function assert_eq_frac(a : frac, b : frac, name : string) =
         if (neq(a, b)) abort(name) else ()
-    function assert_eq_efrac(a : frac, b : frac, name : string) =
-        if (a!=b) abort(name) else ()
+
+    function assert_eq_frac_err(a : frac, b : frac, err : frac, name : string) =
+        if (gt(abs(sub(a, b)), err)) abort(concatList([name, ": ", to_str(a), " vs ", to_str(b)])) else ()
 
     function test() =
 
@@ -175,3 +246,27 @@ contract Frac =
         assert_eq_frac(mul(from_int(0), from_int(4)) , from_int(0), "0 * 4")
         assert_eq_frac(mul(from_int(2), from_int(0)) , from_int(0), "2 * 0")
         assert_eq_frac(mul(from_int(2), from_int(1)) , from_int(2), "2 * 1")
+
+        //int exp
+        assert_eq_frac(int_exp(from_int(2), 2) , from_int(4), "2^2")
+        assert_eq_frac(int_exp(from_int(2), -2) , make_frac(1, 4), "2^-2")
+        assert_eq_frac(int_exp(make_frac(1, 4), 0) , from_int(1), "_^0")
+        assert_eq_frac(int_exp(make_frac(-1, 4), 0) , from_int(1), "neg _^0")
+        assert_eq_frac(int_exp(make_frac(1, 4), 1) , make_frac(1, 4), "_^1")
+        assert_eq_frac(int_exp(make_frac(-1, 4), 1) , make_frac(-1, 4), "neg _^1")
+        assert_eq_frac(int_exp(make_frac(3, 4), 3) , make_frac(27, 64), "3/4 ^3")
+        assert_eq_frac(int_exp(make_frac(3, 4), -3) , make_frac(64, 27), "3/4 ^-3")
+        assert_eq_frac(int_exp(make_frac(2,2), -1) , from_int(1), "1^1")
+
+        let my_err = make_frac(1, 100)
+        // pow
+        assert_eq_frac_err(power(from_int(3), from_int(2), my_err) , from_int(9), my_err, "pow 3^2")
+        assert_eq_frac_err(power(from_int(2), from_int(2), my_err) , from_int(4), my_err, "pow 2^2")
+        assert_eq_frac_err(power(from_int(2), from_int(-2), my_err) , make_frac(1, 4), my_err, "pow 2^-2")
+        assert_eq_frac_err(power(make_frac(1, 4), from_int(0), my_err) , from_int(1), my_err, "pow _^0")
+        assert_eq_frac_err(power(make_frac(-1, 4), from_int(0), my_err) , from_int(1), my_err, "pow neg _^0")
+        assert_eq_frac_err(power(make_frac(1, 4), from_int(1), my_err) , make_frac(1, 4), my_err, "pow _^1")
+        assert_eq_frac_err(power(make_frac(-1, 4), from_int(1), my_err) , make_frac(-1, 4), my_err, "pow neg _^1")
+        assert_eq_frac_err(power(make_frac(3, 4), from_int(3), my_err) , make_frac(27, 64), my_err, "pow 3/4 ^3")
+        assert_eq_frac_err(power(make_frac(3, 4), from_int(-3), my_err) , make_frac(64, 27), my_err, "pow 3/4 ^-3")
+        assert_eq_frac_err(power(make_frac(2,2), from_int(-1), my_err) , from_int(1), my_err, "pow 1^1")
